@@ -6,8 +6,8 @@ from itertools import combinations
 import numpy as np
 from utils import *
 
-from MoE_mpaso import *
-from models_MoE.modules import *
+from moe import *
+from models_moe.modules import *
 
 
 class PosEncoding(torch.nn.Module):

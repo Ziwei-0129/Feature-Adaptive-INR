@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch
 import numpy as np
 
-from models_MoE.modules import *
+from models_moe.modules import *
 
 
 class tSoftMax(nn.Module):
