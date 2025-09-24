@@ -1,8 +1,5 @@
 import numpy as np
 import torch
-
-
-import torch
 import torch.nn as nn
 
 class PositionalEncoding(nn.Module):
@@ -63,6 +60,4 @@ def ReadScalarSubdominBinary(filename, startidx:int, numItems:int):
     data = np.fromfile(filename, count= numItems, offset=startidx*4, dtype=np.float32)
     data = np.log10(data)
     return data
-
-
 

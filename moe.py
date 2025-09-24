@@ -3,6 +3,8 @@ import torch.nn.functional as F
 import torch
 import numpy as np
 
+from models_MoE.modules import *
+
 
 class tSoftMax(nn.Module):
     def __init__(self, temperature, dim=-1, trainable=False):
@@ -17,12 +19,10 @@ class tSoftMax(nn.Module):
     def forward(self, x):
         return self.activation(x / self.temperature)
     
-    
-
 
 
 class Manager(nn.Module):
-    def __init__(self, resolution=16, n_experts=-1, hidden_dim=64):
+    def __init__(self, resolution=16, n_experts=-1, hidden_dim=64, device='cuda'):
         super().__init__()
         self.resolution = resolution
         self.n_experts = n_experts
@@ -30,7 +30,8 @@ class Manager(nn.Module):
         self.num_feat_grid = 16
         
         self.grid = torch.nn.Parameter(
-            torch.Tensor(1, self.num_feat_grid, *reversed(self.grid_shape)),
+            # torch.Tensor(1, self.num_feat_grid, *reversed(self.grid_shape)),
+            torch.empty(1, self.num_feat_grid, *reversed(self.grid_shape), dtype=torch.float32, device=device),
             requires_grad=True
         )
         # Initialize:
@@ -40,21 +41,26 @@ class Manager(nn.Module):
         # Initialize:
         nn.init.orthogonal_(self.linear.weight.data)
         self.linear.bias.data.fill_(0.0)
+
+        self.norm = nn.LayerNorm(self.num_feat_grid)
         
-        # self.norm = nn.LayerNorm(self.num_feat_grid)
-        
+        if torch.__version__ >= '2.0.0':
+            self.forward = torch.compile(self.forward)
+
         
     def forward(self, coords):
+
         batch_size = coords.shape[0]
         sample_grid = coords.view(1, batch_size, 1, 1, 3)
 
         # Sample single feature vector per coordinate
         sampled = F.grid_sample(self.grid, sample_grid, mode='bilinear', align_corners=True)
-        sampled = sampled.reshape(self.num_feat_grid, batch_size).T  # [batch_size, num_feat_grid]
+        # sampled = sampled.reshape(self.num_feat_grid, batch_size).T  # [batch_size, num_feat_grid]
+        sampled = sampled.view(self.num_feat_grid, batch_size).t().contiguous()  # [batch_size, num_feat_grid]
+
 
         # Produce logits directly
-        logits = self.linear(sampled)  # [batch_size, n_experts]
-        # logits = self.linear(self.norm(sampled))  # [batch_size, n_experts]
+        logits = self.linear(self.norm(sampled))  # [batch_size, n_experts]
         return logits
         
         
