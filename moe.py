@@ -41,15 +41,9 @@ class Manager(nn.Module):
         # Initialize:
         nn.init.orthogonal_(self.linear.weight.data)
         self.linear.bias.data.fill_(0.0)
-
         self.norm = nn.LayerNorm(self.num_feat_grid)
         
-        if torch.__version__ >= '2.0.0':
-            self.forward = torch.compile(self.forward)
-
-        
     def forward(self, coords):
-
         batch_size = coords.shape[0]
         sample_grid = coords.view(1, batch_size, 1, 1, 3)
 
@@ -57,9 +51,6 @@ class Manager(nn.Module):
         sampled = F.grid_sample(self.grid, sample_grid, mode='bilinear', align_corners=True)
         # sampled = sampled.reshape(self.num_feat_grid, batch_size).T  # [batch_size, num_feat_grid]
         sampled = sampled.view(self.num_feat_grid, batch_size).t().contiguous()  # [batch_size, num_feat_grid]
-
-
-        # Produce logits directly
         logits = self.linear(self.norm(sampled))  # [batch_size, n_experts]
         return logits
         
