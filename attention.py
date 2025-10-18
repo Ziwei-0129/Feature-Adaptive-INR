@@ -261,14 +261,12 @@ class KVMemoryModel(nn.Module):
 
         for i in range(top_k):
             expert_idx = topk_indices[:, i]  
-            expert_weight = topk_vals[:, i] 
-
+            expert_weight = topk_vals[:, i]
             for eid in torch.unique(expert_idx):
                 eid = eid.item()
                 selected = (expert_idx == eid).nonzero(as_tuple=True)[0]
                 if selected.numel() == 0:
                     continue
-
                 coords_subset = coords[selected]
                 param_feats_subset = param_feats[selected]
                 
