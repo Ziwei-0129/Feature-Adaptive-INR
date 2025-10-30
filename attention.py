@@ -259,32 +259,29 @@ class KVMemoryModel(nn.Module):
         batch_size = x.size(0)
         spatial_feats = coords.new_zeros((batch_size, self.feature_dim_3d))
 
-        for i in range(top_k):
-            expert_idx = topk_indices[:, i]  
-            expert_weight = topk_vals[:, i]
-            for eid in torch.unique(expert_idx):
-                eid = eid.item()
-                selected = (expert_idx == eid).nonzero(as_tuple=True)[0]
-                if selected.numel() == 0:
-                    continue
-                coords_subset = coords[selected]
-                param_feats_subset = param_feats[selected]
-                
-                mlp_feats = self.encoder_mlp_list[eid](self.pe(coords_subset))
-                query_subset = self.layer_norm(mlp_feats)
-
-                out = self.cross_attn_experts[eid](
-                    query_subset, precomputed_keys[eid], precomputed_values[eid], self.top_K, self.chunk_size, 
-                    param_feats_subset
-                )
-                out = out + mlp_feats
-
-                weights = expert_weight[selected].unsqueeze(-1)
-                spatial_feats[selected] += out * weights
+        # Process per expert
+        for eid in torch.unique(topk_indices):
+            mask = (topk_indices == eid)
+            selected = mask.any(dim=1).nonzero(as_tuple=True)[0]
+            if selected.numel() == 0:
+                continue
         
-        # Decoder
-        refined_features = self.mlp(spatial_feats)
-        refined_features = self.sigmoid(refined_features)
-        return refined_features, raw_q
+            expert_weight = topk_vals[mask].view(-1, 1)
+            coords_subset = coords[selected]
+            param_feats_subset = param_feats[selected]
+        
+            mlp_feats = self.encoder_mlp_list[eid](self.pe(coords_subset))
+            query_subset = self.layer_norm(mlp_feats)
+            out = self.cross_attn_experts[eid](
+                query_subset, precomputed_keys[eid], precomputed_values[eid],
+                self.top_K, self.chunk_size, param_feats_subset
+            )
+            out = out + mlp_feats
+
+            weights = expert_weight[selected].unsqueeze(-1)
+            spatial_feats[selected] += out * weights
     
-    
+    # Decoder
+    refined_features = self.mlp(spatial_feats)
+    refined_features = self.sigmoid(refined_features)
+    return refined_features, raw_q
