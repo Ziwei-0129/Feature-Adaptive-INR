@@ -250,7 +250,7 @@ class KVMemoryModel(nn.Module):
         gating_probs = torch.nn.functional.softmax(raw_q, dim=-1)
 
         # Get top-k expert indices and values  
-        gating_probs = torch.clamp(gating_probs, 0.0)
+        gating_probs = torch.clamp(gating_probs, min=1e-8)
         topk_vals, topk_indices = torch.topk(gating_probs, k=top_k, dim=-1)
         
         '''normalize weights so that they sum to 1 (only if K > 1)'''
